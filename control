@@ -1,9 +1,12 @@
 Package: com.sahinkaa.blockappupdates
 Name: Block App Updates
-Version: 1.0.0
+Version: 1.0.1
 Architecture: iphoneos-arm64
 Description: Selectively block updates for individual App Store apps on rootless iOS 15 and later.
-Maintainer: sahinkaa
+Maintainer: sahinkaa/ichitaso
 Author: sahinkaa
 Section: Tweaks
 Depends: firmware (>= 15.0), preferenceloader
+Depiction: https://cydia.ichitaso.com/depiction/blockappupdates.html
+SileoDepiction: https://cydia.ichitaso.com/depiction/blockappupdates.json
+Icon: https://raw.githubusercontent.com/ichitaso/file/refs/heads/main/images/BlockAppUpdates/icon%403x.png

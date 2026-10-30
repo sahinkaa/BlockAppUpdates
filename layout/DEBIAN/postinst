@@ -10,5 +10,10 @@ EOF
     echo "finish:${f}" >&$fd
 }
 
+for helper in $(dpkg -L com.sahinkaa.blockappupdates 2>/dev/null | grep '/bauhelper$'); do
+    chown 0:0 "$helper" 2>/dev/null || true
+    chmod 4755 "$helper" 2>/dev/null || true
+done
+
 finish restart
 exit 0
