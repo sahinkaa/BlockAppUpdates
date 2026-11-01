@@ -1,3 +1,27 @@
+# Block App Updates 1.0.3
+
+## Improvements
+
+- The installed version of each application is shown next to its name, for example **AdGuard (4.5.23)**.
+
+## Fixes
+
+- Applications whose display name is empty (such as Seicomart) are now listed with their bundle name instead of a blank title.
+
+# Block App Updates 1.0.2
+
+## Fixes
+
+- Committing changes no longer breaks TrollStore, TrollStore Lite, or jailbreak applications (missing labels, apps that do not launch or disappear, letterboxed display). Their registrations are restored automatically, so Refresh App Registrations or uicache is no longer needed.
+- Applying changes is much faster: it now completes in about 15–30 seconds instead of more than a minute.
+- App Store's update list is refreshed reliably after blocking or unblocking applications.
+
+# Block App Updates 1.0.1
+
+## Improvements
+
+- Application icons in the Settings list are rendered at the native 29 pt Settings size.
+
 # Block App Updates 1.0.0
 
 The first public release of Block App Updates.

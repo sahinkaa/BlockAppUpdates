@@ -8,12 +8,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly) NSString *bundleIdentifier;
 @property (nonatomic, copy, readonly) NSString *containerPath;
 @property (nonatomic, copy, readonly) NSString *bundlePath;
+@property (nonatomic, copy, readonly, nullable) NSString *version;
 @property (nonatomic, assign, readonly, getter=isBlocked) BOOL blocked;
 
 - (instancetype)initWithName:(NSString *)name
              bundleIdentifier:(NSString *)bundleIdentifier
                  containerPath:(NSString *)containerPath
                     bundlePath:(NSString *)bundlePath
+                       version:(nullable NSString *)version
                        blocked:(BOOL)blocked;
 
 @end

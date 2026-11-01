@@ -23,6 +23,7 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
 @property (nonatomic, copy) NSArray<BAUApp *> *availableApps;
 @property (nonatomic, strong) UITableView *applicationsTableView;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *pendingStates;
+@property (nonatomic, strong) NSCache<NSString *, UIImage *> *iconCache;
 @property (nonatomic, strong) UIBarButtonItem *commitButton;
 @end
 
@@ -33,11 +34,14 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     [super viewDidLoad];
     self.title = @"Block App Updates";
     self.pendingStates = [NSMutableDictionary dictionary];
+    self.iconCache = [[NSCache alloc] init];
+    self.iconCache.countLimit = 128;
 
     self.applicationsTableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
     self.applicationsTableView.translatesAutoresizingMaskIntoConstraints = NO;
     self.applicationsTableView.dataSource = self;
     self.applicationsTableView.delegate = self;
+    self.applicationsTableView.rowHeight = 56.0;
     self.applicationsTableView.alwaysBounceVertical = YES;
     [self.view addSubview:self.applicationsTableView];
     [NSLayoutConstraint activateConstraints:@[
@@ -148,13 +152,25 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
         NSString *bundleIdentifier = info[@"CFBundleIdentifier"];
         if (![bundleIdentifier isKindOfClass:NSString.class] || bundleIdentifier.length == 0) continue;
 
-        NSString *name = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: bundleIdentifier;
-        if (![name isKindOfClass:NSString.class]) name = bundleIdentifier;
+        // Some apps ship an empty CFBundleDisplayName, so fall through to the next non-empty name.
+        NSString *name = bundleIdentifier;
+        for (NSString *key in @[@"CFBundleDisplayName", @"CFBundleName"]) {
+            NSString *candidate = info[key];
+            if ([candidate isKindOfClass:NSString.class] && candidate.length > 0) {
+                name = candidate;
+                break;
+            }
+        }
+
+        NSString *version = info[@"CFBundleShortVersionString"];
+        if (![version isKindOfClass:NSString.class] || version.length == 0) version = info[@"CFBundleVersion"];
+        if (![version isKindOfClass:NSString.class] || version.length == 0) version = nil;
 
         BAUApp *app = [[BAUApp alloc] initWithName:name
                                   bundleIdentifier:bundleIdentifier
                                       containerPath:containerPath
                                          bundlePath:bundlePath
+                                            version:version
                                             blocked:hasBlockedMetadata];
         [(app.isBlocked ? blocked : available) addObject:app];
         [visibleContainerPaths addObject:containerPath];
@@ -218,7 +234,9 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
 
     BAUApp *app = [self appAtIndexPath:indexPath];
     NSNumber *pendingState = self.pendingStates[app.containerPath];
-    cell.textLabel.text = app.name;
+    cell.textLabel.text = app.version
+        ? [NSString stringWithFormat:@"%@ (%@)", app.name, app.version]
+        : app.name;
     if (pendingState) {
         NSString *pendingLabel = pendingState.boolValue ? @"Will block" : @"Will unblock";
         cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ • %@", app.bundleIdentifier, pendingLabel];
@@ -227,10 +245,33 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
         cell.detailTextLabel.text = app.bundleIdentifier;
         cell.accessoryType = UITableViewCellAccessoryNone;
     }
-    cell.imageView.image = [UIImage _applicationIconImageForBundleIdentifier:app.bundleIdentifier
-                                                                      format:2
-                                                                       scale:UIScreen.mainScreen.scale];
+    cell.imageView.image = [self iconForApp:app];
+    cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    cell.imageView.layer.cornerRadius = 6.5;
+    cell.imageView.layer.masksToBounds = YES;
     return cell;
+}
+
+- (UIImage *)iconForApp:(BAUApp *)app
+{
+    UIImage *cachedIcon = [self.iconCache objectForKey:app.bundleIdentifier];
+    if (cachedIcon) return cachedIcon;
+
+    UIImage *sourceIcon = [UIImage _applicationIconImageForBundleIdentifier:app.bundleIdentifier
+                                                                       format:2
+                                                                        scale:UIScreen.mainScreen.scale];
+    if (!sourceIcon) return nil;
+
+    CGSize size = CGSizeMake(29.0, 29.0);
+    UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat defaultFormat];
+    format.scale = UIScreen.mainScreen.scale;
+    format.opaque = NO;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+    UIImage *fittedIcon = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+        [sourceIcon drawInRect:(CGRect){ .origin = CGPointZero, .size = size }];
+    }];
+    [self.iconCache setObject:fittedIcon forKey:app.bundleIdentifier];
+    return fittedIcon;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
@@ -284,7 +325,7 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     }
 
     NSString *message = [NSString stringWithFormat:
-        @"%@\n\nThe App Store must refresh its app information. This usually takes about a minute, and the screen may temporarily stop responding.\n\nKeep the device unlocked and do not restart it until the completion message appears.", summary];
+        @"%@\n\nThe App Store must refresh its app information. This usually takes 15–30 seconds, and the screen may temporarily stop responding.\n\nKeep the device unlocked and do not restart it until the completion message appears.", summary];
     UIAlertController *warning = [UIAlertController alertControllerWithTitle:@"Apply Changes?"
                                                                       message:message
                                                                preferredStyle:UIAlertControllerStyleAlert];
@@ -307,7 +348,7 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     }
 
     UIAlertController *progress = [UIAlertController alertControllerWithTitle:@"Updating App Store Status"
-                                                                       message:@"Refreshing app information…\n\nThis may take about a minute. Keep the device unlocked."
+                                                                       message:@"Refreshing app information…\n\nThis usually takes 15–30 seconds. Keep the device unlocked."
                                                                 preferredStyle:UIAlertControllerStyleAlert];
     UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     spinner.translatesAutoresizingMaskIntoConstraints = NO;
@@ -320,10 +361,27 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     [self presentViewController:progress animated:YES completion:nil];
 
     self.commitButton.enabled = NO;
+    // Keep the screen on to prevent the device from automatically locking and interrupting the Settings app during the process,
+    // and ensure that the process can continue for a short while even if the app happens to move to the background.
+    UIApplication *application = UIApplication.sharedApplication;
+    BOOL previousIdleTimerDisabled = application.idleTimerDisabled;
+    application.idleTimerDisabled = YES;
+    __block UIBackgroundTaskIdentifier backgroundTask = UIBackgroundTaskInvalid;
+    void (^endKeepAwake)(void) = ^{
+        application.idleTimerDisabled = previousIdleTimerDisabled;
+        if (backgroundTask != UIBackgroundTaskInvalid) {
+            [application endBackgroundTask:backgroundTask];
+            backgroundTask = UIBackgroundTaskInvalid;
+        }
+    };
+    backgroundTask = [application beginBackgroundTaskWithName:@"BlockAppUpdatesCommit"
+                                            expirationHandler:^{ endKeepAwake(); }];
+
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *errorMessage = nil;
         BOOL succeeded = [self runHelperArguments:arguments errorMessage:&errorMessage];
         dispatch_async(dispatch_get_main_queue(), ^{
+            endKeepAwake();
             [progress dismissViewControllerAnimated:YES completion:^{
                 if (succeeded) {
                     [self.pendingStates removeAllObjects];
