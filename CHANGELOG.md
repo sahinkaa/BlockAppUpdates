@@ -9,7 +9,6 @@
 ## 1.0.1
 
 - Fit application icons to the Settings list rows.
-- Remove the fixed 60–120 second LaunchServices polling delay after committing changes.
 
 ## 1.0.0
 

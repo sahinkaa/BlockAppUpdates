@@ -11,7 +11,6 @@
 ## Improvements
 
 - Application icons in the Settings list are rendered at the native 29 pt Settings size.
-- Applying staged changes no longer waits for the previous fixed 60–120 second LaunchServices polling period.
 
 # Block App Updates 1.0.0
 
