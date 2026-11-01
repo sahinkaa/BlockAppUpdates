@@ -76,7 +76,8 @@ The project targets iOS 15 and later and builds arm64 and arm64e binaries.
 ## Credits
 
 - Developed by **sahinkaa**
-- Coded with **Codex**
+- Updates 1.0.1-1.0.3 and native RootHide support by **[ichitaso](https://github.com/ichitaso)**
+- Original implementation coded with **Codex**
 - LaunchServices refresh behavior inspired by TrollStore's Rebuild Icon Cache workflow
 
 ## Disclaimer
