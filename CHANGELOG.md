@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3
+
+- Show each application's version next to its name in the Settings list, as in 1.0.0's original design.
+- Fall back to the bundle name when an application's display name is empty, fixing applications listed without a name.
+
 ## 1.0.2
 
 - Re-register jailbreak, TrollStore, and TrollStore Lite applications after the LaunchServices rebuild, fixing apps that stopped launching, lost their icon labels, disappeared, or ran letterboxed after committing changes.

@@ -13,20 +13,22 @@ Block updates for selected App Store applications without disabling updates for 
 - Refreshes the App Store's application information once per commit.
 - Automatically recognizes reinstalled applications and removes obsolete blocked metadata.
 - Excludes TrollStore and TrollStore Lite applications.
-- Uses a native Settings design with application names, bundle identifiers, and icons.
+- Uses a native Settings design with application names, installed versions, bundle identifiers, and icons.
 
 ## Requirements
 
 - iOS 15 or later
-- A rootless jailbreak
+- A rootless or roothide jailbreak
 - PreferenceLoader
 - arm64 or arm64e device
 
-The package is built primarily for Dopamine-style rootless environments. Private LaunchServices behavior can vary between jailbreaks and iOS releases.
+The package is built for Dopamine-style rootless environments and roothide. Private LaunchServices behavior can vary between jailbreaks and iOS releases.
 
 ## Installation
 
-1. Download `com.sahinkaa.blockappupdates_1.0.0_iphoneos-arm64.deb` from the latest GitHub release.
+1. Download the package for your jailbreak from the latest GitHub release:
+   - rootless: `com.sahinkaa.blockappupdates_1.0.3_iphoneos-arm64.deb`
+   - roothide: `com.sahinkaa.blockappupdates_1.0.3_iphoneos-arm64e.deb`
 2. Open the package in Sileo or another compatible package manager.
 3. Install it and select **Restart SpringBoard**.
 4. Open **Settings → Block App Updates**.
@@ -59,10 +61,17 @@ The tweak does not globally disable automatic updates, delete the icon cache, or
 Install and configure [Theos](https://theos.dev), then run:
 
 ```sh
-make clean package FINALPACKAGE=1
+./build.sh
 ```
 
-The project targets rootless iOS 15 and later and builds arm64 and arm64e binaries.
+This builds both the rootless (`iphoneos-arm64`) and roothide (`iphoneos-arm64e`) packages into `packages/`. To build only one of them:
+
+```sh
+make clean package THEOS_PACKAGE_SCHEME=rootless
+make clean package THEOS_PACKAGE_SCHEME=roothide
+```
+
+The project targets iOS 15 and later and builds arm64 and arm64e binaries.
 
 ## Credits
 

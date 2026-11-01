@@ -152,13 +152,25 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
         NSString *bundleIdentifier = info[@"CFBundleIdentifier"];
         if (![bundleIdentifier isKindOfClass:NSString.class] || bundleIdentifier.length == 0) continue;
 
-        NSString *name = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: bundleIdentifier;
-        if (![name isKindOfClass:NSString.class]) name = bundleIdentifier;
+        // Some apps ship an empty CFBundleDisplayName, so fall through to the next non-empty name.
+        NSString *name = bundleIdentifier;
+        for (NSString *key in @[@"CFBundleDisplayName", @"CFBundleName"]) {
+            NSString *candidate = info[key];
+            if ([candidate isKindOfClass:NSString.class] && candidate.length > 0) {
+                name = candidate;
+                break;
+            }
+        }
+
+        NSString *version = info[@"CFBundleShortVersionString"];
+        if (![version isKindOfClass:NSString.class] || version.length == 0) version = info[@"CFBundleVersion"];
+        if (![version isKindOfClass:NSString.class] || version.length == 0) version = nil;
 
         BAUApp *app = [[BAUApp alloc] initWithName:name
                                   bundleIdentifier:bundleIdentifier
                                       containerPath:containerPath
                                          bundlePath:bundlePath
+                                            version:version
                                             blocked:hasBlockedMetadata];
         [(app.isBlocked ? blocked : available) addObject:app];
         [visibleContainerPaths addObject:containerPath];
@@ -222,7 +234,9 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
 
     BAUApp *app = [self appAtIndexPath:indexPath];
     NSNumber *pendingState = self.pendingStates[app.containerPath];
-    cell.textLabel.text = app.name;
+    cell.textLabel.text = app.version
+        ? [NSString stringWithFormat:@"%@ (%@)", app.name, app.version]
+        : app.name;
     if (pendingState) {
         NSString *pendingLabel = pendingState.boolValue ? @"Will block" : @"Will unblock";
         cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ • %@", app.bundleIdentifier, pendingLabel];

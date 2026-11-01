@@ -1,3 +1,13 @@
+# Block App Updates 1.0.3
+
+## Improvements
+
+- The installed version of each application is shown next to its name, for example **AdGuard (4.5.23)**.
+
+## Fixes
+
+- Applications whose display name is empty (such as Seicomart) are now listed with their bundle name instead of a blank title.
+
 # Block App Updates 1.0.2
 
 ## Fixes
