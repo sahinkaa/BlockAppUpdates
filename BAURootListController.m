@@ -311,7 +311,7 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     }
 
     NSString *message = [NSString stringWithFormat:
-        @"%@\n\nThe App Store must refresh its app information. This usually takes about a minute, and the screen may temporarily stop responding.\n\nKeep the device unlocked and do not restart it until the completion message appears.", summary];
+        @"%@\n\nThe App Store must refresh its app information. This usually takes 15–30 seconds, and the screen may temporarily stop responding.\n\nKeep the device unlocked and do not restart it until the completion message appears.", summary];
     UIAlertController *warning = [UIAlertController alertControllerWithTitle:@"Apply Changes?"
                                                                       message:message
                                                                preferredStyle:UIAlertControllerStyleAlert];
@@ -334,7 +334,7 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     }
 
     UIAlertController *progress = [UIAlertController alertControllerWithTitle:@"Updating App Store Status"
-                                                                       message:@"Refreshing app information…\n\nThis may take about a minute. Keep the device unlocked."
+                                                                       message:@"Refreshing app information…\n\nThis usually takes 15–30 seconds. Keep the device unlocked."
                                                                 preferredStyle:UIAlertControllerStyleAlert];
     UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     spinner.translatesAutoresizingMaskIntoConstraints = NO;

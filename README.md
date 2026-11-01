@@ -38,7 +38,7 @@ The package is built primarily for Dopamine-style rootless environments. Private
 3. Review the confirmation and select **Apply Changes**.
 4. Keep the device unlocked until the completion message appears.
 
-Refreshing the App Store information normally takes a few seconds. Keep the device unlocked until the completion message appears.
+Refreshing the App Store information normally takes 15–30 seconds. Keep the device unlocked until the completion message appears.
 
 To allow updates again, select an application under **Blocked Updates** and commit the change.
 
@@ -50,7 +50,7 @@ For an application selected for blocking, the tweak renames:
 iTunesMetadata.plist → iTunesMetadata_blocked.plist
 ```
 
-Unblocking restores the original filename. After committing, a privileged helper requests one LaunchServices database refresh so the App Store reloads the application's installed state. The helper does not wait on an arbitrary delay after that request has been accepted.
+Unblocking restores the original filename. After committing, a privileged helper requests one LaunchServices database refresh so the App Store reloads the application's installed state. Because that rebuild only restores applications known to installd, the helper then re-registers jailbreak applications (`uicache -p`) and TrollStore / TrollStore Lite applications (their own `trollstorehelper refresh`, the same as **Refresh App Registrations**), and finally restarts App Store and `appstored` so the update list is reloaded.
 
 The tweak does not globally disable automatic updates, delete the icon cache, or respring after every change. TrollStore applications are ignored because they do not use normal App Store metadata.
 

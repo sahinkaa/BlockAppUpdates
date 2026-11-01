@@ -1,3 +1,11 @@
+# Block App Updates 1.0.2
+
+## Fixes
+
+- Committing changes no longer breaks TrollStore, TrollStore Lite, or jailbreak applications (missing labels, apps that do not launch or disappear, letterboxed display). Their registrations are restored automatically, so Refresh App Registrations or uicache is no longer needed.
+- Applying changes is much faster: it now completes in about 15–30 seconds instead of more than a minute.
+- App Store's update list is refreshed reliably after blocking or unblocking applications.
+
 # Block App Updates 1.0.1
 
 ## Improvements
