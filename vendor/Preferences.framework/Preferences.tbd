@@ -1,0 +1,11 @@
+--- !tapi-tbd-v3
+archs: [ arm64, arm64e ]
+platform: ios
+install-name: /System/Library/PrivateFrameworks/Preferences.framework/Preferences
+current-version: 1.0.0
+compatibility-version: 1.0.0
+objc-constraint: retain_release
+exports:
+  - archs: [ arm64, arm64e ]
+    objc-classes: [ PSViewController ]
+...

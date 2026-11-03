@@ -2,6 +2,8 @@
 #import "BAUApp.h"
 
 #import <UIKit/UIKit.h>
+#import <roothide.h>
+#import <errno.h>
 #import <spawn.h>
 #import <stdlib.h>
 #import <sys/wait.h>
@@ -25,6 +27,7 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *pendingStates;
 @property (nonatomic, strong) NSCache<NSString *, UIImage *> *iconCache;
 @property (nonatomic, strong) UIBarButtonItem *commitButton;
+@property (nonatomic, strong) UIBarButtonItem *layoutButton;
 @end
 
 @implementation BAURootListController
@@ -56,7 +59,10 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
                                                          style:UIBarButtonItemStyleDone
                                                         target:self
                                                         action:@selector(commitButtonPressed)];
-    self.navigationItem.rightBarButtonItem = self.commitButton;
+    self.layoutButton = [[UIBarButtonItem alloc] initWithTitle:@"Restore Icon Layout"
+        style:UIBarButtonItemStylePlain target:self action:@selector(offerLayoutRestore)];
+    self.navigationItem.rightBarButtonItems = @[self.commitButton, self.layoutButton];
+    [self updateLayoutButton];
     [self updateCommitButton];
     [self reloadApplications];
 }
@@ -299,6 +305,61 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
         : @"Commit";
 }
 
+static NSString *BAULayoutBackupPath(void)
+{
+    return jbroot(@"/var/mobile/Library/Preferences/com.sahinkaa.blockappupdates.layout.plist");
+}
+
+- (void)updateLayoutButton
+{
+    NSDictionary *backup = [NSDictionary dictionaryWithContentsOfFile:BAULayoutBackupPath()];
+    BOOL recoveryNeeded = [backup[@"recoveryNeeded"] boolValue];
+    self.navigationItem.rightBarButtonItems = recoveryNeeded
+        ? @[self.commitButton, self.layoutButton] : @[self.commitButton];
+    self.layoutButton.enabled = recoveryNeeded;
+}
+
+- (void)offerLayoutRestore
+{
+    NSDictionary *backup = [NSDictionary dictionaryWithContentsOfFile:BAULayoutBackupPath()];
+    if (![backup[@"layout"] isKindOfClass:NSDictionary.class] || ![backup[@"layout"] count]) {
+        [self showMessageWithTitle:@"Layout Unavailable" message:@"There is no valid saved Home Screen layout."];
+        return;
+    }
+
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Restore Home Screen Layout?"
+        message:@"Make sure your jailbreak apps are visible. Restoring replaces the current layout with the saved copy and resprings."
+        preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Later" style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Respring to Restore Layout" style:UIAlertActionStyleDefault
+        handler:^(__unused UIAlertAction *action) {
+            [self restoreSavedLayoutAndRespring];
+        }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)restoreSavedLayoutAndRespring
+{
+    NSMutableDictionary *backup = [NSMutableDictionary dictionaryWithContentsOfFile:BAULayoutBackupPath()];
+    if (![backup[@"layout"] isKindOfClass:NSDictionary.class] || ![backup[@"layout"] count]) {
+        [self showMessageWithTitle:@"Restore Unavailable" message:@"There is no valid saved layout."];
+        return;
+    }
+
+    self.layoutButton.enabled = NO;
+    self.commitButton.enabled = NO;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *error = nil;
+        if (![self runHelperArguments:@[@"respring-layout"] errorMessage:&error]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self updateLayoutButton];
+                [self updateCommitButton];
+                [self showMessageWithTitle:@"Respring Needed" message:error];
+            });
+        }
+    });
+}
+
 - (void)commitButtonPressed
 {
     NSUInteger count = self.pendingStates.count;
@@ -324,10 +385,8 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
             (unsigned long)unblockCount, unblockCount == 1 ? @"app" : @"apps"];
     }
 
-    NSString *message = [NSString stringWithFormat:
-        @"%@\n\nThe App Store must refresh its app information. This usually takes 15–30 seconds, and the screen may temporarily stop responding.\n\nKeep the device unlocked and do not restart it until the completion message appears.", summary];
     UIAlertController *warning = [UIAlertController alertControllerWithTitle:@"Apply Changes?"
-                                                                      message:message
+                                                                      message:summary
                                                                preferredStyle:UIAlertControllerStyleAlert];
     [warning addAction:[UIAlertAction actionWithTitle:@"Not Now" style:UIAlertActionStyleCancel handler:nil]];
     [warning addAction:[UIAlertAction actionWithTitle:@"Apply Changes"
@@ -347,8 +406,13 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
         [arguments addObject:containerPath];
     }
 
+    if (self.layoutButton.enabled) {
+        [self showMessageWithTitle:@"Restore Icon Layout First"
+            message:@"Recover the previous layout before starting another Commit."];
+        return;
+    }
     UIAlertController *progress = [UIAlertController alertControllerWithTitle:@"Updating App Store Status"
-                                                                       message:@"Refreshing app information…\n\nThis usually takes 15–30 seconds. Keep the device unlocked."
+                                                                       message:@"Refreshing app information. Keep the device unlocked. It will respring when complete.\n\n"
                                                                 preferredStyle:UIAlertControllerStyleAlert];
     UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     spinner.translatesAutoresizingMaskIntoConstraints = NO;
@@ -361,6 +425,7 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     [self presentViewController:progress animated:YES completion:nil];
 
     self.commitButton.enabled = NO;
+    self.layoutButton.enabled = NO;
     // Keep the screen on to prevent the device from automatically locking and interrupting the Settings app during the process,
     // and ensure that the process can continue for a short while even if the app happens to move to the background.
     UIApplication *application = UIApplication.sharedApplication;
@@ -383,11 +448,16 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
         dispatch_async(dispatch_get_main_queue(), ^{
             endKeepAwake();
             [progress dismissViewControllerAnimated:YES completion:^{
+                [self updateLayoutButton];
                 if (succeeded) {
                     [self.pendingStates removeAllObjects];
                     [self reloadApplications];
-                    [self showMessageWithTitle:@"Changes Applied"
-                                      message:@"The selected update settings were committed. Reopen App Store to see the refreshed state."];
+                    if (!errorMessage.length) {
+                        [self restoreSavedLayoutAndRespring];
+                    } else {
+                        [self showMessageWithTitle:@"Changes Applied"
+                            message:[errorMessage stringByAppendingString:@" Your backup is available under Restore Icon Layout."]];
+                    }
                 } else {
                     [self updateCommitButton];
                     [self showMessageWithTitle:@"Block App Updates"
@@ -446,8 +516,14 @@ static NSString *const BAUBlockedMetadataName = @"iTunesMetadata_blocked.plist";
     close(errorPipe[0]);
 
     int status = 0;
-    waitpid(pid, &status, 0);
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return YES;
+    pid_t waited;
+    do { waited = waitpid(pid, &status, 0); } while (waited < 0 && errno == EINTR);
+    if (waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+        if (errorMessage && errorData.length) {
+            *errorMessage = [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
+        }
+        return YES;
+    }
 
     NSString *helperError = [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
     if (errorMessage) {

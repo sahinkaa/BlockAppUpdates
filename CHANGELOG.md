@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- Automatically save and restore Home Screen folders and icon placement when applying changes. The restored layout persists across later resprings.
+- Preserve Sileo's existing notification choice after the App Store refresh so it does not ask again.
+- Shorten the confirmation and show that the device will respring when the refresh is complete.
+
 ## 1.0.3
 
 - Show each application's version next to its name in the Settings list, as in 1.0.0's original design.

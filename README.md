@@ -1,6 +1,6 @@
 # Block App Updates
 
-Block updates for selected App Store applications without disabling updates for everything else.
+Block updates for selected App Store apps and preserve your Home Screen layout when applying changes.
 
 **Developed by [sahinkaa](https://github.com/sahinkaa)**  
 **Coded with Codex**
@@ -11,9 +11,11 @@ Block updates for selected App Store applications without disabling updates for 
 - Keeps applications with blocked updates in a separate **Blocked Updates** section.
 - Stages multiple block and unblock selections before applying them together.
 - Refreshes the App Store's application information once per commit.
+- Saves and restores your Home Screen layout automatically, including folders and icon placement.
+- Preserves Sileo's existing notification choice through the refresh.
 - Automatically recognizes reinstalled applications and removes obsolete blocked metadata.
 - Excludes TrollStore and TrollStore Lite applications.
-- Uses a native Settings design with application names, installed versions, bundle identifiers, and icons.
+- Uses a native Settings design with application names, installed versions, bundle identifiers and icons.
 
 ## Requirements
 
@@ -26,21 +28,18 @@ The package is built for Dopamine-style rootless environments and roothide. Priv
 
 ## Installation
 
-1. Download the package for your jailbreak from the latest GitHub release:
-   - rootless: `com.sahinkaa.blockappupdates_1.0.3_iphoneos-arm64.deb`
-   - roothide: `com.sahinkaa.blockappupdates_1.0.3_iphoneos-arm64e.deb`
-2. Open the package in Sileo or another compatible package manager.
-3. Install it and select **Restart SpringBoard**.
-4. Open **Settings → Block App Updates**.
+Add [sahinkaa](https://sahinkaa.github.io/) to Sileo or Zebra and install **Block App Updates**. The package manager selects the build for your jailbreak. Both builds are also available from the [GitHub release](https://github.com/sahinkaa/BlockAppUpdates/releases/tag/v1.0.4).
+
+After installation, select **Restart SpringBoard** when prompted and open **Settings → Block App Updates**.
 
 ## Usage
 
 1. Tap one or more applications to stage their update status.
 2. Tap **Commit** in the navigation bar.
 3. Review the confirmation and select **Apply Changes**.
-4. Keep the device unlocked until the completion message appears.
+4. Keep the device unlocked until it resprings.
 
-Refreshing the App Store information normally takes 15–30 seconds. Keep the device unlocked until the completion message appears.
+Refreshing the App Store information usually takes 15-30 seconds. The tweak restores your Home Screen layout automatically when SpringBoard restarts.
 
 To allow updates again, select an application under **Blocked Updates** and commit the change.
 
@@ -52,9 +51,9 @@ For an application selected for blocking, the tweak renames:
 iTunesMetadata.plist → iTunesMetadata_blocked.plist
 ```
 
-Unblocking restores the original filename. After committing, a privileged helper requests one LaunchServices database refresh so the App Store reloads the application's installed state. Because that rebuild only restores applications known to installd, the helper then re-registers jailbreak applications (`uicache -p`) and TrollStore / TrollStore Lite applications (their own `trollstorehelper refresh`, the same as **Refresh App Registrations**), and finally restarts App Store and `appstored` so the update list is reloaded.
+Unblocking restores the original filename. The helper refreshes LaunchServices once per commit, re-registers jailbreak and TrollStore apps then restarts the App Store processes. It saves Sileo's existing Allow or Don't Allow choice before the refresh and restores that entry afterward.
 
-The tweak does not globally disable automatic updates, delete the icon cache, or respring after every change. TrollStore applications are ignored because they do not use normal App Store metadata.
+The built-in layout backup uses SpringBoard's own icon store and verifies the restored layout when SpringBoard loads it. This keeps the restored placement across later resprings. If automatic recovery is interrupted, use **Restore Icon Layout** when it appears in Settings.
 
 ## Building from source
 

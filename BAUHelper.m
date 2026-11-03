@@ -13,6 +13,11 @@
 #import <string.h>
 #import <sys/wait.h>
 #import <unistd.h>
+#import <sys/stat.h>
+#import <sys/sysctl.h>
+#import <sys/proc.h>
+#import <pwd.h>
+#import <roothide.h>
 
 extern char **environ;
 
@@ -220,7 +225,7 @@ static NSArray<NSString *> *BAUApplicationBundlesInDirectory(NSString *directory
     return bundles;
 }
 
-static void BAURestoreThirdPartyRegistrations(void)
+static BOOL BAURestoreThirdPartyRegistrations(void)
 {
     // Rebuilding the LaunchServices databases only re-registers apps known to installd.
     // Jailbreak apps, TrollStore and TrollStore Lite register themselves directly with
@@ -230,9 +235,25 @@ static void BAURestoreThirdPartyRegistrations(void)
     NSString *jailbreakApplicationsPath = [jailbreakRoot stringByAppendingPathComponent:@"Applications"];
 
     NSString *uicachePath = [jailbreakRoot stringByAppendingPathComponent:@"usr/bin/uicache"];
-    if (jailbreakRoot && BAUIsExecutable(uicachePath)) {
-        for (NSString *bundlePath in BAUApplicationBundlesInDirectory(jailbreakApplicationsPath)) {
-            BAURunTool(uicachePath, @[@"-p", bundlePath], 30.0);
+    BOOL success = jailbreakRoot != nil;
+    NSArray<NSString *> *bundles = jailbreakRoot ? BAUApplicationBundlesInDirectory(jailbreakApplicationsPath) : @[];
+    for (NSString *bundlePath in bundles) {
+        if (!BAUIsExecutable(uicachePath) || BAURunTool(uicachePath, @[@"-p", bundlePath], 30.0) != 0) {
+            success = NO;
+            continue;
+        }
+        NSString *identifier = [NSDictionary dictionaryWithContentsOfFile:
+            [bundlePath stringByAppendingPathComponent:@"Info.plist"]][@"CFBundleIdentifier"];
+        Class proxyClass = NSClassFromString(@"LSApplicationProxy");
+        SEL lookup = NSSelectorFromString(@"applicationProxyForIdentifier:");
+        id proxy = [identifier isKindOfClass:NSString.class] && [proxyClass respondsToSelector:lookup]
+            ? ((id (*)(id, SEL, id))objc_msgSend)(proxyClass, lookup, identifier) : nil;
+        SEL bundleURL = NSSelectorFromString(@"bundleURL");
+        NSURL *url = [proxy respondsToSelector:bundleURL]
+            ? ((id (*)(id, SEL))objc_msgSend)(proxy, bundleURL) : nil;
+        if (![url isKindOfClass:NSURL.class] ||
+            ![url.path.stringByResolvingSymlinksInPath isEqualToString:bundlePath.stringByResolvingSymlinksInPath]) {
+            success = NO;
         }
     }
 
@@ -241,14 +262,15 @@ static void BAURestoreThirdPartyRegistrations(void)
         NSString *trollStoreHelperPath = [BAUApplicationsPath stringByAppendingPathComponent:
             [container stringByAppendingPathComponent:@"TrollStore.app/trollstorehelper"]];
         if (BAUIsExecutable(trollStoreHelperPath)) {
-            BAURunTool(trollStoreHelperPath, @[@"refresh"], 60.0);
+            if (BAURunTool(trollStoreHelperPath, @[@"refresh"], 60.0) != 0) success = NO;
         }
     }
 
     NSString *trollStoreLiteHelperPath = [jailbreakApplicationsPath stringByAppendingPathComponent:@"TrollStoreLite.app/trollstorehelper"];
     if (jailbreakRoot && BAUIsExecutable(trollStoreLiteHelperPath)) {
-        BAURunTool(trollStoreLiteHelperPath, @[@"refresh"], 60.0);
+        if (BAURunTool(trollStoreLiteHelperPath, @[@"refresh"], 60.0) != 0) success = NO;
     }
+    return success;
 }
 
 static void BAUTerminateAppStoreProcesses(void)
@@ -294,6 +316,129 @@ static int BAUCleanupReinstalledContainer(NSString *requestedPath)
         return 8;
     }
     return 0;
+}
+
+static NSString *BAULayoutBackupPath(void)
+{
+    return jbroot(@"/var/mobile/Library/Preferences/com.sahinkaa.blockappupdates.layout.plist");
+}
+
+static BOOL BAUSaveLayoutBackup(void)
+{
+    NSTimeInterval requestedAt = NSProcessInfo.processInfo.systemUptime;
+    if (notify_post("com.sahinkaa.blockappupdates.capture-layout") == NOTIFY_STATUS_OK) {
+        for (unsigned attempt = 0; attempt < 30; ++attempt) {
+            NSDictionary *backup = [NSDictionary dictionaryWithContentsOfFile:BAULayoutBackupPath()];
+            id layout = backup[@"layout"];
+            if ([backup[@"capturedAt"] doubleValue] >= requestedAt &&
+                [layout isKindOfClass:NSDictionary.class] && [layout count]) return YES;
+            usleep(100000);
+        }
+    }
+    fprintf(stderr, "SpringBoard did not provide a fresh Home Screen backup. Respring once after installing Block App Updates and retry. No update settings were changed.");
+    return NO;
+}
+
+static NSString *const BAUSileoIdentifier = @"org.coolstar.SileoStore";
+static const char *const BAUNotificationStorePath =
+    "/var/mobile/Library/BulletinBoard/VersionedSectionInfo.plist";
+
+static NSData *BAUReadNotificationStore(struct stat *info)
+{
+    int fd = open(BAUNotificationStorePath, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0) return nil;
+    NSFileHandle *file = [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:YES];
+    NSData *data = nil;
+    if (fstat(fd, info) == 0 && S_ISREG(info->st_mode) &&
+        info->st_size > 0 && info->st_size <= 16 * 1024 * 1024) {
+        data = [file readDataUpToLength:(NSUInteger)info->st_size error:nil];
+        if (data.length != (NSUInteger)info->st_size) data = nil;
+    }
+    return data;
+}
+
+static NSDictionary *BAUNotificationSections(NSData *data, NSPropertyListFormat *format)
+{
+    id store = data ? [NSPropertyListSerialization propertyListWithData:data
+        options:NSPropertyListImmutable format:format error:nil] : nil;
+    if (![store isKindOfClass:NSDictionary.class] ||
+        ![store[@"sectionInfo"] isKindOfClass:NSDictionary.class]) return nil;
+    return store;
+}
+
+static NSNumber *BAUSileoAuthorizationStatus(id record)
+{
+    if (![record isKindOfClass:NSData.class] || [record length] > 256 * 1024) return nil;
+    // Inspect the archive as a plist. Keep its opaque bytes for restoration.
+    id archive = [NSPropertyListSerialization propertyListWithData:record
+        options:NSPropertyListImmutable format:NULL error:nil];
+    if (![archive isKindOfClass:NSDictionary.class] ||
+        ![archive[@"$archiver"] isEqual:@"NSKeyedArchiver"] ||
+        ![archive[@"$objects"] isKindOfClass:NSArray.class]) return nil;
+
+    NSArray *objects = archive[@"$objects"];
+    if (![objects containsObject:BAUSileoIdentifier]) return nil;
+    NSNumber *status = nil;
+    for (id object in objects) {
+        if (![object isKindOfClass:NSDictionary.class]) continue;
+        id value = object[@"authorizationStatus"];
+        if (!value) continue;
+        if (status || ![value isKindOfClass:NSNumber.class]) return nil;
+        status = value;
+    }
+    return status;
+}
+
+static NSData *BAUSaveSileoChoice(void)
+{
+    struct stat info;
+    NSDictionary *store = BAUNotificationSections(BAUReadNotificationStore(&info), NULL);
+    id record = store[@"sectionInfo"][BAUSileoIdentifier];
+    NSNumber *status = BAUSileoAuthorizationStatus(record);
+    // Preserve an explicit denial (1) or authorization (2) exactly as stored.
+    return ([status isEqual:@1] || [status isEqual:@2]) ? record : nil;
+}
+
+static void BAURestoreSileoChoice(NSData *saved)
+{
+    if (!saved) return;
+
+    struct stat original;
+    NSData *current = BAUReadNotificationStore(&original);
+    NSPropertyListFormat format;
+    NSDictionary *store = BAUNotificationSections(current, &format);
+    if (!store) return;
+
+    NSMutableDictionary *sections = [store[@"sectionInfo"] mutableCopy];
+    sections[BAUSileoIdentifier] = saved;
+    NSMutableDictionary *updated = [store mutableCopy];
+    updated[@"sectionInfo"] = sections;
+    NSData *replacement = [NSPropertyListSerialization dataWithPropertyList:updated
+        format:format options:0 error:nil];
+    if (!replacement) return;
+
+    // Use the store owner's permissions and never change the destination in place.
+    struct passwd *mobile = getpwnam("mobile");
+    if (!mobile || mobile->pw_uid == 0 || original.st_uid != mobile->pw_uid ||
+        seteuid(mobile->pw_uid) != 0) return;
+    char temporary[] = "/var/mobile/Library/BulletinBoard/.bau-notifications.XXXXXX";
+    int fd = mkstemp(temporary);
+    if (fd >= 0) {
+        NSFileHandle *file = [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:YES];
+        if ([file writeData:replacement error:nil] &&
+            fchown(fd, (uid_t)-1, original.st_gid) == 0 &&
+            fchmod(fd, original.st_mode & 0777) == 0 && fsync(fd) == 0) {
+            struct stat latest;
+            NSData *latestData = BAUReadNotificationStore(&latest);
+            if ([latestData isEqualToData:current] &&
+                original.st_dev == latest.st_dev && original.st_ino == latest.st_ino) {
+                rename(temporary, BAUNotificationStorePath);
+            }
+        }
+        [file closeAndReturnError:nil];
+        unlink(temporary);
+    }
+    seteuid(0);
 }
 
 static int BAUCommitChanges(NSArray<NSString *> *arguments)
@@ -346,6 +491,9 @@ static int BAUCommitChanges(NSArray<NSString *> *arguments)
         }
     }
 
+    if (!BAUSaveLayoutBackup()) return 12;
+    NSData *sileoChoice = BAUSaveSileoChoice();
+
     NSMutableArray<NSDictionary<NSString *, NSString *> *> *applied = [NSMutableArray array];
     for (NSDictionary<NSString *, NSString *> *change in changes) {
         if (rename(change[@"source"].fileSystemRepresentation, change[@"destination"].fileSystemRepresentation) != 0) {
@@ -361,16 +509,61 @@ static int BAUCommitChanges(NSArray<NSString *> *arguments)
     // One expensive refresh covers every rename in this commit.
     BAURebuildLaunchServicesDatabases();
     BAUWaitForLaunchServicesToSettle(expectations);
-    BAURestoreThirdPartyRegistrations();
+    if (!BAURestoreThirdPartyRegistrations()) {
+        fprintf(stderr, "Some app registrations could not be verified. Check that your jailbreak apps are visible before restoring the Home Screen layout.");
+    }
     notify_post("com.apple.mobile.application_installed");
     BAUTerminateAppStoreProcesses();
+    BAURestoreSileoChoice(sileoChoice);
     return 0;
+}
+
+static pid_t BAUSpringBoardPID(void)
+{
+    int bytes = proc_listpids(BAUProcAllPIDs, 0, NULL, 0);
+    if (bytes <= 0) return 0;
+    size_t capacity = (size_t)bytes + 32 * sizeof(pid_t);
+    pid_t *pids = calloc(1, capacity);
+    if (!pids) return 0;
+    bytes = proc_listpids(BAUProcAllPIDs, 0, pids, (int)capacity);
+    pid_t springBoard = 0;
+    for (int i = 0; i < bytes / (int)sizeof(pid_t); ++i) {
+        char name[64] = {0};
+        if (pids[i] > 1 && proc_name(pids[i], name, sizeof(name)) > 0 && strcmp(name, "SpringBoard") == 0) {
+            springBoard = pids[i];
+            break;
+        }
+    }
+    free(pids);
+    return springBoard;
+}
+
+static BOOL BAURestoreLayoutAndRestart(void)
+{
+    NSString *path = BAULayoutBackupPath();
+    NSMutableDictionary *backup = [NSMutableDictionary dictionaryWithContentsOfFile:path];
+    id layout = backup[@"layout"];
+    pid_t springBoard = BAUSpringBoardPID();
+    if (springBoard <= 1 || ![layout isKindOfClass:NSDictionary.class] || ![layout count]) return NO;
+
+    struct passwd *mobile = getpwnam("mobile");
+    if (!mobile || mobile->pw_uid == 0 || seteuid(mobile->pw_uid) != 0) return NO;
+    backup[@"restorePending"] = @YES;
+    BOOL staged = [backup writeToFile:path atomically:YES];
+    if (seteuid(0) != 0 || !staged) return NO;
+    if (kill(springBoard, SIGKILL) == 0) return YES;
+
+    if (seteuid(mobile->pw_uid) == 0) {
+        [backup removeObjectForKey:@"restorePending"];
+        [backup writeToFile:path atomically:YES];
+    }
+    return NO;
 }
 
 int main(int argc, char *argv[])
 {
     @autoreleasepool {
-        if (argc < 3) {
+        if (argc < 2) {
             fprintf(stderr, "Invalid arguments.");
             return 2;
         }
@@ -384,6 +577,11 @@ int main(int argc, char *argv[])
         }
 
         NSString *command = [NSString stringWithUTF8String:argv[1]];
+        if ([command isEqualToString:@"respring-layout"] && argc == 2) {
+            if (BAURestoreLayoutAndRestart()) return 0;
+            fprintf(stderr, "Could not restore the layout and restart SpringBoard. Your backup is available under Restore Icon Layout.");
+            return 11;
+        }
         if ([command isEqualToString:@"cleanup"] && argc == 3) {
             return BAUCleanupReinstalledContainer([NSString stringWithUTF8String:argv[2]]);
         }
