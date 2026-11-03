@@ -26,6 +26,8 @@ Block updates for selected App Store apps and preserve your Home Screen layout w
 
 The package is built for Dopamine-style rootless environments and roothide. Private LaunchServices behavior can vary between jailbreaks and iOS releases.
 
+Version 1.0.4 was device tested on **iOS 16.6 RootHide** and **iOS 26.0.1 RootHide**.
+
 ## Installation
 
 Add [sahinkaa](https://sahinkaa.github.io/) to Sileo or Zebra and install **Block App Updates**. The package manager selects the build for your jailbreak. Both builds are also available from the [GitHub release](https://github.com/sahinkaa/BlockAppUpdates/releases/tag/v1.0.4).
