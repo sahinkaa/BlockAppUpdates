@@ -2,6 +2,7 @@ DEBUG = 0
 FINALPACKAGE = 1
 
 THEOS_DEVICE_IP = 127.0.0.1 -p 2222
+INSTALL_TARGET_PROCESSES = backboardd
 
 ARCHS = arm64 arm64e
 TARGET = iphone:clang:latest:15.0
@@ -44,6 +45,5 @@ before-package::
 	$(ECHO_NOTHING)find "$(THEOS_STAGING_DIR)" -type d -exec chmod 0755 {} +$(ECHO_END)
 	$(ECHO_NOTHING)find "$(THEOS_STAGING_DIR)" -type f ! -path "*/DEBIAN/*" ! -name BlockAppUpdates ! -name bauhelper ! -name BAULayout.dylib -exec chmod 0644 {} +$(ECHO_END)
 	$(ECHO_NOTHING)find "$(THEOS_STAGING_DIR)" -type f -name BlockAppUpdates -exec chmod 0755 {} +$(ECHO_END)
-
-after-install::
-	install.exec "killall -9 Preferences 2>/dev/null || true"
+	$(ECHO_NOTHING)find "$(THEOS_STAGING_DIR)" -type f -name bauhelper -exec chmod 4755 {} +$(ECHO_END)
+	$(ECHO_NOTHING)chmod 0755 "$(THEOS_STAGING_DIR)/DEBIAN/postinst" "$(THEOS_STAGING_DIR)/DEBIAN/postrm"$(ECHO_END)
