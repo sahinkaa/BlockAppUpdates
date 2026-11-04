@@ -2,7 +2,7 @@ Package: com.sahinkaa.blockappupdates
 Name: Block App Updates
 Version: 1.0.5
 Architecture: iphoneos-arm64
-Description: Selectively block updates for individual App Store apps on rootless or roothide iOS 15 and later.
+Description: Block updates for selected App Store apps while preserving your Home Screen layout and notification choices. iOS 15-26.
 Maintainer: sahinkaa/ichitaso
 Author: sahinkaa • ichitaso
 Section: Tweaks

@@ -3,7 +3,6 @@
 ## 1.0.5
 
 - Preserve the existing Allow or Don't Allow notification choice of all jailbreak, TrollStore and TrollStore Lite apps after the App Store refresh, not only Sileo's.
-- Ask to restore the previous Home Screen layout before showing the confirmation, instead of after **Apply Changes** is selected.
 - Trim stray whitespace from helper messages shown in alerts.
 - Set the helper's setuid bit and the installer scripts' permissions while packaging, so `make package` alone produces a correct package. Remove `normalize_package.py` and simplify `build.sh`.
 

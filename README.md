@@ -26,7 +26,7 @@ Block updates for selected App Store apps and preserve your Home Screen layout w
 
 The package is built for Dopamine-style rootless environments and roothide. Private LaunchServices behavior can vary between jailbreaks and iOS releases.
 
-Version 1.0.5 was device tested on **iOS 16.5 Dopamine**, **iOS 17.5.1 Dopamine** and **iOS 26.0.1 RootHide**. Version 1.0.4 was device tested on **iOS 16.6 RootHide** and **iOS 26.0.1 RootHide**.
+ichitaso tested version 1.0.5 on **iOS 16.5 Dopamine**, **iOS 17.5.1 Dopamine** and **iOS 26.0.1 RootHide**. sahinkaa tested version 1.0.4 on **iOS 16.6 RootHide** and **iOS 26.0.1 RootHide**.
 
 ## Installation
 
@@ -83,4 +83,4 @@ The project targets iOS 15 and later and builds arm64 and arm64e binaries.
 
 ## Disclaimer
 
-Use this software at your own risk. Test it with a non-critical application first. This project is not affiliated with Apple, TrollStore, Dopamine, or Sileo.
+Use this software at your own risk. Test it with a non-critical application first. This project is not affiliated with Apple, TrollStore, Dopamine or Sileo.
