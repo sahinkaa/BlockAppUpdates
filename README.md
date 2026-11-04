@@ -12,7 +12,7 @@ Block updates for selected App Store apps and preserve your Home Screen layout w
 - Stages multiple block and unblock selections before applying them together.
 - Refreshes the App Store's application information once per commit.
 - Saves and restores your Home Screen layout automatically, including folders and icon placement.
-- Preserves Sileo's existing notification choice through the refresh.
+- Preserves the notification choice of Sileo and other jailbreak and TrollStore apps through the refresh.
 - Automatically recognizes reinstalled applications and removes obsolete blocked metadata.
 - Excludes TrollStore and TrollStore Lite applications.
 - Uses a native Settings design with application names, installed versions, bundle identifiers and icons.
@@ -26,11 +26,11 @@ Block updates for selected App Store apps and preserve your Home Screen layout w
 
 The package is built for Dopamine-style rootless environments and roothide. Private LaunchServices behavior can vary between jailbreaks and iOS releases.
 
-Version 1.0.4 was device tested on **iOS 16.6 RootHide** and **iOS 26.0.1 RootHide**.
+Version 1.0.5 was device tested on **iOS 16.5 Dopamine**, **iOS 17.5.1 Dopamine** and **iOS 26.0.1 RootHide**. Version 1.0.4 was device tested on **iOS 16.6 RootHide** and **iOS 26.0.1 RootHide**.
 
 ## Installation
 
-Add [sahinkaa](https://sahinkaa.github.io/) to Sileo or Zebra and install **Block App Updates**. The package manager selects the build for your jailbreak. Both builds are also available from the [GitHub release](https://github.com/sahinkaa/BlockAppUpdates/releases/tag/v1.0.4).
+Add [sahinkaa](https://sahinkaa.github.io/) to Sileo or Zebra and install **Block App Updates**. The package manager selects the build for your jailbreak. Both builds are also available from the [GitHub release](https://github.com/sahinkaa/BlockAppUpdates/releases/tag/v1.0.5).
 
 After installation, select **Restart SpringBoard** when prompted and open **Settings → Block App Updates**.
 
@@ -53,7 +53,7 @@ For an application selected for blocking, the tweak renames:
 iTunesMetadata.plist → iTunesMetadata_blocked.plist
 ```
 
-Unblocking restores the original filename. The helper refreshes LaunchServices once per commit, re-registers jailbreak and TrollStore apps then restarts the App Store processes. It saves Sileo's existing Allow or Don't Allow choice before the refresh and restores that entry afterward.
+Unblocking restores the original filename. The helper refreshes LaunchServices once per commit, re-registers jailbreak and TrollStore apps then restarts the App Store processes. It saves the existing Allow or Don't Allow notification choice of every jailbreak, TrollStore and TrollStore Lite app (including Sileo) before the refresh and restores those entries afterward.
 
 The built-in layout backup uses SpringBoard's own icon store and verifies the restored layout when SpringBoard loads it. This keeps the restored placement across later resprings. If automatic recovery is interrupted, use **Restore Icon Layout** when it appears in Settings.
 

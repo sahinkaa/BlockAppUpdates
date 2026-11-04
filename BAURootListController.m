@@ -365,6 +365,12 @@ static NSString *BAULayoutBackupPath(void)
     NSUInteger count = self.pendingStates.count;
     if (count == 0) return;
 
+    if (self.layoutButton.enabled) {
+        [self showMessageWithTitle:@"Restore Icon Layout First"
+            message:@"Recover the previous layout before starting another Commit."];
+        return;
+    }
+
     NSUInteger blockCount = 0;
     NSUInteger unblockCount = 0;
     for (NSNumber *state in self.pendingStates.allValues) {
@@ -406,11 +412,6 @@ static NSString *BAULayoutBackupPath(void)
         [arguments addObject:containerPath];
     }
 
-    if (self.layoutButton.enabled) {
-        [self showMessageWithTitle:@"Restore Icon Layout First"
-            message:@"Recover the previous layout before starting another Commit."];
-        return;
-    }
     UIAlertController *progress = [UIAlertController alertControllerWithTitle:@"Updating App Store Status"
                                                                        message:@"Refreshing app information. Keep the device unlocked. It will respring when complete.\n\n"
                                                                 preferredStyle:UIAlertControllerStyleAlert];
@@ -520,12 +521,14 @@ static NSString *BAULayoutBackupPath(void)
     do { waited = waitpid(pid, &status, 0); } while (waited < 0 && errno == EINTR);
     if (waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0) {
         if (errorMessage && errorData.length) {
-            *errorMessage = [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
+            *errorMessage = [[[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding]
+                stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
         }
         return YES;
     }
 
-    NSString *helperError = [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
+    NSString *helperError = [[[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding]
+        stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if (errorMessage) {
         *errorMessage = helperError.length > 0
             ? helperError

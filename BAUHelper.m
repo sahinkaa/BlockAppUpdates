@@ -339,7 +339,6 @@ static BOOL BAUSaveLayoutBackup(void)
     return NO;
 }
 
-static NSString *const BAUSileoIdentifier = @"org.coolstar.SileoStore";
 static const char *const BAUNotificationStorePath =
     "/var/mobile/Library/BulletinBoard/VersionedSectionInfo.plist";
 
@@ -366,7 +365,7 @@ static NSDictionary *BAUNotificationSections(NSData *data, NSPropertyListFormat 
     return store;
 }
 
-static NSNumber *BAUSileoAuthorizationStatus(id record)
+static NSNumber *BAUAuthorizationStatus(id record, NSString *identifier)
 {
     if (![record isKindOfClass:NSData.class] || [record length] > 256 * 1024) return nil;
     // Inspect the archive as a plist. Keep its opaque bytes for restoration.
@@ -377,7 +376,7 @@ static NSNumber *BAUSileoAuthorizationStatus(id record)
         ![archive[@"$objects"] isKindOfClass:NSArray.class]) return nil;
 
     NSArray *objects = archive[@"$objects"];
-    if (![objects containsObject:BAUSileoIdentifier]) return nil;
+    if (![objects containsObject:identifier]) return nil;
     NSNumber *status = nil;
     for (id object in objects) {
         if (![object isKindOfClass:NSDictionary.class]) continue;
@@ -389,19 +388,48 @@ static NSNumber *BAUSileoAuthorizationStatus(id record)
     return status;
 }
 
-static NSData *BAUSaveSileoChoice(void)
+static NSSet<NSString *> *BAUThirdPartyBundleIdentifiers(void)
 {
-    struct stat info;
-    NSDictionary *store = BAUNotificationSections(BAUReadNotificationStore(&info), NULL);
-    id record = store[@"sectionInfo"][BAUSileoIdentifier];
-    NSNumber *status = BAUSileoAuthorizationStatus(record);
-    // Preserve an explicit denial (1) or authorization (2) exactly as stored.
-    return ([status isEqual:@1] || [status isEqual:@2]) ? record : nil;
+    // Apps that the LaunchServices rebuild drops and BAURestoreThirdPartyRegistrations re-registers:
+    // jailbreak apps, TrollStore / TrollStore Lite and the apps they installed.
+    NSMutableArray<NSString *> *bundles = [NSMutableArray array];
+    NSString *jailbreakRoot = BAUJailbreakRootPath();
+    if (jailbreakRoot) {
+        [bundles addObjectsFromArray:BAUApplicationBundlesInDirectory([jailbreakRoot stringByAppendingPathComponent:@"Applications"])];
+    }
+    NSArray<NSString *> *containers = [NSFileManager.defaultManager contentsOfDirectoryAtPath:BAUApplicationsPath error:nil] ?: @[];
+    for (NSString *container in containers) {
+        NSString *containerPath = [BAUApplicationsPath stringByAppendingPathComponent:container];
+        NSString *bundlePath = BAUAppBundlePath(containerPath);
+        if (bundlePath && (BAUHasMarker(containerPath) || BAUHasMarker(bundlePath))) [bundles addObject:bundlePath];
+    }
+
+    NSMutableSet<NSString *> *identifiers = [NSMutableSet set];
+    for (NSString *bundlePath in bundles) {
+        id identifier = [NSDictionary dictionaryWithContentsOfFile:
+            [bundlePath stringByAppendingPathComponent:@"Info.plist"]][@"CFBundleIdentifier"];
+        if ([identifier isKindOfClass:NSString.class] && [identifier length]) [identifiers addObject:identifier];
+    }
+    return identifiers;
 }
 
-static void BAURestoreSileoChoice(NSData *saved)
+static NSDictionary<NSString *, NSData *> *BAUSaveNotificationChoices(void)
 {
-    if (!saved) return;
+    struct stat info;
+    NSDictionary *sections = BAUNotificationSections(BAUReadNotificationStore(&info), NULL)[@"sectionInfo"];
+    NSMutableDictionary<NSString *, NSData *> *choices = [NSMutableDictionary dictionary];
+    for (NSString *identifier in BAUThirdPartyBundleIdentifiers()) {
+        id record = sections[identifier];
+        NSNumber *status = BAUAuthorizationStatus(record, identifier);
+        // Preserve an explicit denial (1) or authorization (2) exactly as stored.
+        if ([status isEqual:@1] || [status isEqual:@2]) choices[identifier] = record;
+    }
+    return choices;
+}
+
+static void BAURestoreNotificationChoices(NSDictionary<NSString *, NSData *> *saved)
+{
+    if (!saved.count) return;
 
     struct stat original;
     NSData *current = BAUReadNotificationStore(&original);
@@ -410,7 +438,7 @@ static void BAURestoreSileoChoice(NSData *saved)
     if (!store) return;
 
     NSMutableDictionary *sections = [store[@"sectionInfo"] mutableCopy];
-    sections[BAUSileoIdentifier] = saved;
+    [sections addEntriesFromDictionary:saved];
     NSMutableDictionary *updated = [store mutableCopy];
     updated[@"sectionInfo"] = sections;
     NSData *replacement = [NSPropertyListSerialization dataWithPropertyList:updated
@@ -492,7 +520,7 @@ static int BAUCommitChanges(NSArray<NSString *> *arguments)
     }
 
     if (!BAUSaveLayoutBackup()) return 12;
-    NSData *sileoChoice = BAUSaveSileoChoice();
+    NSDictionary<NSString *, NSData *> *notificationChoices = BAUSaveNotificationChoices();
 
     NSMutableArray<NSDictionary<NSString *, NSString *> *> *applied = [NSMutableArray array];
     for (NSDictionary<NSString *, NSString *> *change in changes) {
@@ -514,7 +542,7 @@ static int BAUCommitChanges(NSArray<NSString *> *arguments)
     }
     notify_post("com.apple.mobile.application_installed");
     BAUTerminateAppStoreProcesses();
-    BAURestoreSileoChoice(sileoChoice);
+    BAURestoreNotificationChoices(notificationChoices);
     return 0;
 }
 
