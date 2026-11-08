@@ -5,6 +5,14 @@ Block updates for selected App Store apps and preserve your Home Screen layout w
 **Developed by [sahinkaa](https://github.com/sahinkaa)**  
 **Coded with Codex**
 
+## Screenshots
+
+<p align="center">
+  <a href="screenshots/blocked-updates.jpg"><img src="screenshots/blocked-updates.jpg" width="240" alt="Blocked Updates list with installed app versions"></a>
+  <a href="screenshots/apply-changes.jpg"><img src="screenshots/apply-changes.jpg" width="240" alt="Confirmation before allowing updates again for selected apps"></a>
+  <a href="screenshots/updating-app-store-status.jpg"><img src="screenshots/updating-app-store-status.jpg" width="240" alt="App Store refresh in progress after applying changes"></a>
+</p>
+
 ## Features
 
 - Lists eligible App Store applications in a dedicated Settings pane.
